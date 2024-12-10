@@ -1,17 +1,26 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-TOKEN = '7701740230:AAFNt9Cm2b3NvEGTnHRdMfeOyrEf8Er8J38'
+TOKEN = '7518401446:AAGSHaBaBJS5FqouZop33Ul_vlIaS6VcMbw'
 
 # Comando inicial
-async def start(update: Update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Verificar si ya se envió la imagen
+    user_id = update.effective_user.id
+    if context.user_data.get("image_shown") is None:  # Si no existe la bandera
+        # Enviar la imagen
+        with open("C:/Users/heard/Desktop/ChatDjango-main/api/img/menu.jpg", "rb") as image:  # Reemplaza con la ruta a tu imagen
+            await update.message.reply_photo(photo=image, caption="¡Bienvenido/a! 🌟")
+        # Marcar que ya se envió la imagen
+        context.user_data["image_shown"] = True
+    
     keyboard = [
         [InlineKeyboardButton("Toma asistencia", callback_data='toma_asistencia')],
         [InlineKeyboardButton("Agenda", callback_data='agenda')],
         [InlineKeyboardButton("PREMIUM", callback_data='premium_menu')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("¡Hola! Selecciona una opción del menú principal:", reply_markup=reply_markup)
+    await update.message.reply_text("¡Hola! \nSoy tu asistente personal😁. \n\nSelecciona una opción del menú principal 🤔:", reply_markup=reply_markup)
 
 # Manejar interacciones con botones
 async def button_handler(update: Update, context):
