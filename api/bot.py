@@ -7,6 +7,7 @@ TOKEN = '7701740230:AAFNt9Cm2b3NvEGTnHRdMfeOyrEf8Er8J38'
 # Diccionario para registrar los IDs de los usuarios
 awaiting_message_input = {}
 selected_target_user = {}
+send_to_all = {}
 
 # Conectar a la base de datos SQLite y crear la tabla si no existe
 def init_db():
@@ -97,8 +98,9 @@ async def button_handler(update: Update, context):
         if not users:
             text = "🚫 No hay usuarios registrados."
         else:
-            text = "📈 **Enviar mensaje a un usuario**: Elige el usuario."
+            text = "📈 **Enviar mensaje a un usuario**: Elige el usuario o selecciona 'Enviar a todos'."
             keyboard = [[InlineKeyboardButton(f"{user[2]} ({user[1]})", callback_data=f"send_message_{user[0]}")] for user in users]
+            keyboard.append([InlineKeyboardButton("✉️ Enviar a todos", callback_data='send_to_all')])
             keyboard.append([InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')])
             reply_markup = InlineKeyboardMarkup(keyboard)
             await safe_edit_message(query, text=text, reply_markup=reply_markup)
@@ -123,10 +125,15 @@ async def button_handler(update: Update, context):
 async def send_message_to_user(update: Update, context):
     query = update.callback_query
     await query.answer()
-    target_user_id = int(query.data.split('_')[2])
-    selected_target_user[query.from_user.id] = target_user_id
-    awaiting_message_input[query.from_user.id] = True
-    text = f"📈 Ingresa el mensaje para el usuario con ID {target_user_id}."
+    if query.data == 'send_to_all':
+        send_to_all[query.from_user.id] = True
+        awaiting_message_input[query.from_user.id] = True
+        text = "✉️ Ingresa el mensaje que deseas enviar a todos los usuarios."
+    else:
+        target_user_id = int(query.data.split('_')[2])
+        selected_target_user[query.from_user.id] = target_user_id
+        awaiting_message_input[query.from_user.id] = True
+        text = f"📈 Ingresa el mensaje para el usuario con ID {target_user_id}."
     keyboard = [[InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await safe_edit_message(query, text=text, reply_markup=reply_markup)
@@ -135,20 +142,27 @@ async def send_message_to_user(update: Update, context):
 async def handle_message(update: Update, context):
     user_id = update.message.from_user.id
     if user_id in awaiting_message_input and awaiting_message_input[user_id]:
-        target_user_id = selected_target_user[user_id]
-        try:
-            await context.bot.send_message(chat_id=target_user_id, text=update.message.text)
-            await update.message.reply_text("✅ *Mensaje enviado con éxito* 🎉")
-            awaiting_message_input[user_id] = False
-            text = "¿Deseas enviar otro mensaje?"
-            keyboard = [
-                [InlineKeyboardButton("📩 Enviar otro mensaje", callback_data=f"send_message_{target_user_id}")],
-                [InlineKeyboardButton("🔙 Volver a la lista", callback_data='envio_calificaciones')],
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(text=text, reply_markup=reply_markup)
-        except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+        if user_id in send_to_all and send_to_all[user_id]:
+            conn = sqlite3.connect('users.db')
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM users')
+            users = cursor.fetchall()
+            conn.close()
+            for user in users:
+                try:
+                    await context.bot.send_message(chat_id=user[0], text=update.message.text)
+                except Exception as e:
+                    print(f"Error al enviar mensaje al usuario {user[0]}: {e}")
+            await update.message.reply_text("✅ *Mensaje enviado a todos los usuarios con éxito* 🎉")
+            send_to_all[user_id] = False
+        else:
+            target_user_id = selected_target_user[user_id]
+            try:
+                await context.bot.send_message(chat_id=target_user_id, text=update.message.text)
+                await update.message.reply_text("✅ *Mensaje enviado con éxito* 🎉")
+            except Exception as e:
+                await update.message.reply_text(f"❌ Error: {e}")
+        awaiting_message_input[user_id] = False
     else:
         await update.message.reply_text("⚠️ No hay ninguna acción pendiente.")
 
@@ -157,7 +171,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler, pattern="^(toma_asistencia|agenda|premium_menu|envio_calificaciones|menu_principal)$"))
-    app.add_handler(CallbackQueryHandler(send_message_to_user, pattern=r"^send_message_\d+$"))
+    app.add_handler(CallbackQueryHandler(send_message_to_user, pattern=r"^(send_message_\d+|send_to_all)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("Bot en ejecución... 🚀")
     app.run_polling()
