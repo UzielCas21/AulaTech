@@ -58,11 +58,11 @@ async def start(update: Update, context):
     image_url = "https://articulandoo.com/wp-content/uploads/2023/04/Quieres-ser-mas-Eficiente-como-Docente-Descubre-como-la-IA-Generativa-puede-Ayudarte-a-Lograrlo-scaled.jpg"
     await update.message.reply_photo(photo=image_url, caption="🎉 ¡Bienvenido a *AulaTech* 🎓!\nTu asistente para una educación más eficiente ✨")
 
-    # Crear el menú
+    # Crear el menú con estilos y emojis
     keyboard = [
-        [InlineKeyboardButton("📝 Toma asistencia", callback_data='toma_asistencia')],
-        [InlineKeyboardButton("📅 Agenda", callback_data='agenda')],
-        [InlineKeyboardButton("💎 Hazte PREMIUM", callback_data='premium_menu')],
+        [InlineKeyboardButton("📝 ✨ Toma asistencia ✨", callback_data='toma_asistencia')],
+        [InlineKeyboardButton("📅 🎯 Agenda 🎯", callback_data='agenda')],
+        [InlineKeyboardButton("💎 🚀 Hazte PREMIUM 🚀", callback_data='premium_menu')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("✨ *Selecciona una opción del menú:*", reply_markup=reply_markup)
@@ -73,105 +73,138 @@ async def button_handler(update: Update, context):
     await query.answer()
 
     if query.data == 'toma_asistencia':
-        text = "📝 **Toma asistencia**: ¡Claro! Te voy a ayudar con la toma de asistencia 🙌"
+        text = "📝 **Toma asistencia**: Selecciona una opción."
+        keyboard = [
+            [InlineKeyboardButton("➕ Crear grupo", callback_data='crear_grupo')],
+            [InlineKeyboardButton("📂 Escoger grupo", callback_data='escoger_grupo')],
+            [InlineKeyboardButton("🔙 ⬅️ Volver al menú principal ⬅️", callback_data='menu_principal')],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await safe_edit_message(query, text=text, reply_markup=reply_markup)
+    elif query.data == 'crear_grupo':
+        text = "➕ **Crear grupo**: Por favor, ingresa el nombre del nuevo grupo."
+        awaiting_message_input[query.from_user.id] = 'crear_grupo'
+        await safe_edit_message(query, text=text)
+    elif query.data == 'escoger_grupo':
+        # Recuperar grupos existentes (esto depende de la lógica de la base de datos de grupos)
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT group_name FROM groups')
+        groups = cursor.fetchall()
+        conn.close()
+
+        if not groups:
+            text = "📂 **Escoger grupo**: No hay grupos disponibles."
+        else:
+            text = "📂 **Escoger grupo**: Selecciona un grupo de la lista."
+            keyboard = [[InlineKeyboardButton(group[0], callback_data=f'grupo_{group[0]}')] for group in groups]
+            keyboard.append([InlineKeyboardButton("🔙 ⬅️ Volver al menú principal ⬅️", callback_data='menu_principal')])
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await safe_edit_message(query, text=text, reply_markup=reply_markup)
+            return
+
+        await safe_edit_message(query, text=text)
+    elif query.data.startswith('grupo_'):
+        group_name = query.data.split('_')[1]
+        text = f"✅ Has seleccionado el grupo: {group_name}."
+        await safe_edit_message(query, text=text)
     elif query.data == 'agenda':
         text = "📅 **Agenda**: Aquí puedes gestionar tus eventos y actividades 📅📋"
+        await safe_edit_message(query, text=text)
     elif query.data == 'premium_menu':
         text = "💎 Accede a alguna opción *PREMIUM*:"
         keyboard = [
-            [InlineKeyboardButton("🔖 Registro de actividades", callback_data='registro_actividades')],
-            [InlineKeyboardButton("📊 Generación de reportes", callback_data='generacion_reportes')],
-            [InlineKeyboardButton("📈 Envío de calificaciones", callback_data='envio_calificaciones')],
-            [InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')],
+            [InlineKeyboardButton("🔖 ✏️ Registro de actividades ✏️", callback_data='registro_actividades')],
+            [InlineKeyboardButton("📊 📋 Generación de reportes 📋", callback_data='generacion_reportes')],
+            [InlineKeyboardButton("📈 📌 Envío de calificaciones 📌", callback_data='envio_calificaciones')],
+            [InlineKeyboardButton("🔙 ⬅️ Volver al menú principal ⬅️", callback_data='menu_principal')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await safe_edit_message(query, text=text, reply_markup=reply_markup)
         return
     elif query.data == 'envio_calificaciones':
-        # Mostrar usuarios registrados
         conn = sqlite3.connect('users.db')
         cursor = conn.cursor()
-        cursor.execute('SELECT user_id, username, first_name FROM users')
+        cursor.execute('SELECT user_id, first_name FROM users')
         users = cursor.fetchall()
         conn.close()
 
         if not users:
-            text = "🚫 No hay usuarios registrados."
+            text = "📈 No hay usuarios registrados para enviar calificaciones."
         else:
-            text = "📈 **Enviar mensaje a un usuario**: Elige el usuario o selecciona 'Enviar a todos'."
-            keyboard = [[InlineKeyboardButton(f"{user[2]} ({user[1]})", callback_data=f"send_message_{user[0]}")] for user in users]
-            keyboard.append([InlineKeyboardButton("✉️ Enviar a todos", callback_data='send_to_all')])
-            keyboard.append([InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')])
+            text = "📈 Selecciona los usuarios a los que deseas enviar las calificaciones:"
+            keyboard = [[InlineKeyboardButton(f"{user[1]} (ID: {user[0]})", callback_data=f'envio_{user[0]}')] for user in users]
+            keyboard.append([InlineKeyboardButton("🔙 ⬅️ Volver al menú principal ⬅️", callback_data='menu_principal')])
             reply_markup = InlineKeyboardMarkup(keyboard)
             await safe_edit_message(query, text=text, reply_markup=reply_markup)
-        return
+            return
+
+        await safe_edit_message(query, text=text)
+    elif query.data.startswith('envio_'):
+        user_id = query.data.split('_')[1]
+        selected_target_user[query.from_user.id] = user_id
+        awaiting_message_input[query.from_user.id] = 'send_message'
+        text = f"✏️ Ingresa el mensaje para enviar al usuario con ID: {user_id}."
+        await safe_edit_message(query, text=text)
     elif query.data == 'menu_principal':
-        # Volver al menú principal
         keyboard = [
-            [InlineKeyboardButton("📝 Toma asistencia", callback_data='toma_asistencia')],
-            [InlineKeyboardButton("📅 Agenda", callback_data='agenda')],
-            [InlineKeyboardButton("💎 Hazte PREMIUM", callback_data='premium_menu')],
+            [InlineKeyboardButton("📝 ✨ Toma asistencia ✨", callback_data='toma_asistencia')],
+            [InlineKeyboardButton("📅 🎯 Agenda 🎯", callback_data='agenda')],
+            [InlineKeyboardButton("💎 🚀 Hazte PREMIUM 🚀", callback_data='premium_menu')],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await safe_edit_message(query, text="✨ *Selecciona una opción del menú:*", reply_markup=reply_markup)
-        return
     else:
         text = "⚠️ Opción no válida. ¡Por favor, selecciona una opción del menú! 😅"
-        keyboard = [[InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')]]
+        keyboard = [[InlineKeyboardButton("🔙 ⬅️ Volver al menú principal ⬅️", callback_data='menu_principal')]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await safe_edit_message(query, text=text, reply_markup=reply_markup)
 
-# Manejar la selección de usuario para enviar mensaje
-async def send_message_to_user(update: Update, context):
-    query = update.callback_query
-    await query.answer()
-    if query.data == 'send_to_all':
-        send_to_all[query.from_user.id] = True
-        awaiting_message_input[query.from_user.id] = True
-        text = "✉️ Ingresa el mensaje que deseas enviar a todos los usuarios."
-    else:
-        target_user_id = int(query.data.split('_')[2])
-        selected_target_user[query.from_user.id] = target_user_id
-        awaiting_message_input[query.from_user.id] = True
-        text = f"📈 Ingresa el mensaje para el usuario con ID {target_user_id}."
-    keyboard = [[InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await safe_edit_message(query, text=text, reply_markup=reply_markup)
-
-# Manejar el ingreso del mensaje
 async def handle_message(update: Update, context):
     user_id = update.message.from_user.id
-    if user_id in awaiting_message_input and awaiting_message_input[user_id]:
-        if user_id in send_to_all and send_to_all[user_id]:
+    if user_id in awaiting_message_input:
+        action = awaiting_message_input[user_id]
+
+        if action == 'crear_grupo':
+            group_name = update.message.text
+            # Guardar el grupo en la base de datos
             conn = sqlite3.connect('users.db')
             cursor = conn.cursor()
-            cursor.execute('SELECT user_id FROM users')
-            users = cursor.fetchall()
+            cursor.execute('''CREATE TABLE IF NOT EXISTS groups (group_name TEXT)''')
+            cursor.execute('INSERT INTO groups (group_name) VALUES (?)', (group_name,))
+            conn.commit()
             conn.close()
-            for user in users:
-                try:
-                    await context.bot.send_message(chat_id=user[0], text=update.message.text)
-                except Exception as e:
-                    print(f"Error al enviar mensaje al usuario {user[0]}: {e}")
-            await update.message.reply_text("✅ *Mensaje enviado a todos los usuarios con éxito* 🎉")
-            send_to_all[user_id] = False
-        else:
-            target_user_id = selected_target_user[user_id]
-            try:
-                await context.bot.send_message(chat_id=target_user_id, text=update.message.text)
-                await update.message.reply_text("✅ *Mensaje enviado con éxito* 🎉")
-            except Exception as e:
-                await update.message.reply_text(f"❌ Error: {e}")
-        awaiting_message_input[user_id] = False
-    else:
-        await update.message.reply_text("⚠️ No hay ninguna acción pendiente.")
+
+            await update.message.reply_text(f"✅ Grupo '{group_name}' creado con éxito.")
+
+        elif action == 'send_message':
+            target_user_id = selected_target_user.get(user_id)
+            if target_user_id:
+                message = update.message.text
+                await context.bot.send_message(chat_id=target_user_id, text=message)
+
+                # Crear el menú para enviar otro mensaje o regresar a la lista
+                keyboard = [
+                    [InlineKeyboardButton("✏️ Enviar otro mensaje", callback_data=f'envio_{target_user_id}')],
+                    [InlineKeyboardButton("📋 Regresar a la lista de usuarios", callback_data='envio_calificaciones')],
+                    [InlineKeyboardButton("🔙 Volver al menú principal", callback_data='menu_principal')],
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+
+                await update.message.reply_text(
+                    f"✅ Mensaje enviado al usuario con ID: {target_user_id}.",
+                    reply_markup=reply_markup
+                )
+            else:
+                await update.message.reply_text("⚠️ Error: No se pudo encontrar al usuario objetivo.")
+
+        awaiting_message_input[user_id] = None
 
 # Configuración de handlers
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(toma_asistencia|agenda|premium_menu|envio_calificaciones|menu_principal)$"))
-    app.add_handler(CallbackQueryHandler(send_message_to_user, pattern=r"^(send_message_\d+|send_to_all)$"))
+    app.add_handler(CallbackQueryHandler(button_handler, pattern="^(toma_asistencia|agenda|premium_menu|crear_grupo|escoger_grupo|menu_principal|grupo_.*|envio_.*)$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     print("Bot en ejecución... 🚀")
     app.run_polling()
